@@ -14,6 +14,13 @@ type Props = {
   initialMessages?: Message[]
 }
 
+// Commands that should render immediately without char-by-char drip
+const SLASH_PATTERN = /^\s*(whoami|\/help|sudo\s+hire-?mark|cat\s+resume\.pdf)\s*[.!?]?\s*$/i
+
+function isSlashCommand(text: string): boolean {
+  return SLASH_PATTERN.test(text)
+}
+
 export function ChatStream({ initialMessages = [] }: Props) {
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [input, setInput] = useState('')
@@ -22,20 +29,28 @@ export function ChatStream({ initialMessages = [] }: Props) {
   const [citations, setCitations] = useState<string[]>([])
   const dripRef = useRef<DripQueue | null>(null)
   const assistantBufRef = useRef('')
+  const isSlashRef = useRef(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // Persist to sessionStorage after each turn
   useEffect(() => {
     if (messages.length > 0) saveMessages(messages)
   }, [messages])
 
-  // Auto-scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, status])
 
   const appendChar = (char: string) => {
     assistantBufRef.current += char
+    setMessages((prev) => {
+      const next = [...prev]
+      next[next.length - 1] = { role: 'assistant', content: assistantBufRef.current }
+      return next
+    })
+  }
+
+  const appendDirect = (text: string) => {
+    assistantBufRef.current += text
     setMessages((prev) => {
       const next = [...prev]
       next[next.length - 1] = { role: 'assistant', content: assistantBufRef.current }
@@ -51,9 +66,9 @@ export function ChatStream({ initialMessages = [] }: Props) {
     setStatus(null)
     setCitations([])
     assistantBufRef.current = ''
+    isSlashRef.current = isSlashCommand(content)
 
     const userMsg: Message = { role: 'user', content }
-    // Only send non-announcement messages as history
     const sendableHistory = messages.filter((m) => m.role !== 'assistant' || m.content.length > 0)
     const history = [...sendableHistory, userMsg]
     setMessages([...messages, userMsg, { role: 'assistant', content: '' }])
@@ -69,8 +84,16 @@ export function ChatStream({ initialMessages = [] }: Props) {
         handleEvent(event, drip)
       }
     } catch {
+      // Network drop mid-stream: flush whatever arrived, re-enable input
       drip.flush()
+      assistantBufRef.current += assistantBufRef.current ? '\n\n[Connection lost]' : '[Connection lost]'
+      setMessages((prev) => {
+        const next = [...prev]
+        next[next.length - 1] = { role: 'assistant', content: assistantBufRef.current }
+        return next
+      })
       setStreaming(false)
+      setStatus(null)
     }
   }
 
@@ -80,25 +103,40 @@ export function ChatStream({ initialMessages = [] }: Props) {
         setStatus(event.step)
         break
       case 'delta':
-        drip.enqueue(event.text)
+        if (isSlashRef.current) {
+          // Slash commands: render immediately, no char-by-char drip
+          appendDirect(event.text)
+        } else {
+          drip.enqueue(event.text)
+        }
         break
       case 'citation':
         setCitations(event.sources.map((s) => s.title))
         break
+      case 'action':
+        // cat resume.pdf → trigger download or new-tab open
+        if (event.action_type === 'download') {
+          const a = document.createElement('a')
+          a.href = event.url
+          a.download = ''
+          a.click()
+        } else {
+          window.open(event.url, '_blank')
+        }
+        break
       case 'done':
-        drip.flush()
-        setStreaming(false)
-        setStatus(null)
+        if (isSlashRef.current) {
+          setStreaming(false)
+          setStatus(null)
+        } else {
+          drip.flush()
+        }
         break
       case 'error':
         drip.flush()
-        assistantBufRef.current += `\n\n⚠ ${event.message}`
-        setMessages((prev) => {
-          const next = [...prev]
-          next[next.length - 1] = { role: 'assistant', content: assistantBufRef.current }
-          return next
-        })
+        appendDirect(event.message)
         setStreaming(false)
+        setStatus(null)
         break
     }
   }
@@ -112,7 +150,7 @@ export function ChatStream({ initialMessages = [] }: Props) {
       <div className="flex-1 overflow-y-auto flex flex-col gap-3 pb-2">
         {messages.map((msg, i) => (
           <div key={i}>
-            <span className={msg.role === 'user' ? 'text-gray-500' : 'text-gray-500'}>
+            <span className="text-gray-500">
               {msg.role === 'user' ? '> ' : '$ '}
             </span>
             <span className={msg.role === 'user' ? 'text-green-400' : 'text-gray-200'}>

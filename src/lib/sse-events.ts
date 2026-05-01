@@ -31,26 +31,16 @@ export type ErrorEvent = {
   message: string
 }
 
+export type ActionEvent = {
+  type: 'action'
+  action_type: 'download' | 'open'
+  url: string
+}
+
 export type SSEEvent =
   | RetrievalStepEvent
   | DeltaEvent
   | CitationEvent
   | DoneEvent
   | ErrorEvent
-
-// Example wire payloads:
-//
-// event: retrieval_step
-// data: {"step":"retrieving","detail":"searching knowledge base"}
-//
-// event: delta
-// data: {"text":"Mark worked on"}
-//
-// event: citation
-// data: {"sources":[{"title":"Tutor-AI"},{"title":"Portfolio Chatbot"}]}
-//
-// event: done
-// data: {}
-//
-// event: error
-// data: {"code":"upstream_error","message":"models are napping, try again"}
+  | ActionEvent
