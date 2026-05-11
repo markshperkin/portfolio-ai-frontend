@@ -73,7 +73,10 @@ export function BootupBanner({ onComplete }: Props) {
     const fetchReadiness = fetch('/api/readiness', {
       signal: AbortSignal.timeout(15_000),
     })
-      .then((r) => r.json() as Promise<Readiness>)
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status))
+        return r.json() as Promise<Readiness>
+      })
       .catch(() => FALLBACK)
 
     if (reducedMotion) {
