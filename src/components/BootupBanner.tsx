@@ -3,58 +3,105 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { DripQueue } from '@/lib/drip'
 
-const BANNER_TEXT = `\
+const HEADER = `\
 ███╗   ███╗  █████╗  ██████╗  ██╗  ██╗
 ████╗ ████║ ██╔══██╗ ██╔══██╗ ██║ ██╔╝
 ██╔████╔██║ ███████║ ██████╔╝ █████╔╝
 ██║╚██╔╝██║ ██╔══██║ ██╔══██╗ ██╔═██╗
 ██║ ╚═╝ ██║ ██║  ██║ ██║  ██║ ██║  ██╗
 ╚═╝     ╚═╝ ╚═╝  ╚═╝ ╚═╝  ╚═╝ ╚═╝  ╚═╝
-                              G P T
+                              G P T  v1.0`
 
-[  OK  ] knowledge base .............. online
-[  OK  ] rag pipeline ................ ready
-[  OK  ] model: claude haiku 4.5 ..... ready
+const TAGLINE = `
 
 Mark's GPT — a RAG-backed assistant trained on Mark Shperkin's
 actual work: projects, experience, skills, and more.
 Ask anything. I'll cite my sources.`
 
-type Props = {
-  onComplete: () => void
+type CheckResult = { status: string; detail: string }
+type Readiness = {
+  status: string
+  knowledge_base: CheckResult
+  model: CheckResult
 }
+
+function pad(label: string, width: number) {
+  return label + ' ' + '.'.repeat(Math.max(1, width - label.length - 1))
+}
+
+function buildChecks(r: Readiness): string {
+  const kb = r.knowledge_base
+  const mdl = r.model
+  const col = 32
+  const kbTag = kb.status === 'ok' ? '[  OK  ]' : '[ FAIL ]'
+  const kbDetail = kb.status === 'ok' ? `online — ${kb.detail} chunks` : kb.detail
+  const mdlTag = mdl.status === 'ok' ? '[  OK  ]' : '[ FAIL ]'
+  const mdlDetail = mdl.status === 'ok' ? 'ready' : mdl.detail
+
+  return (
+    '\n\n' +
+    `${kbTag} ${pad('RAG knowledge base', col)} ${kbDetail}\n` +
+    `${mdlTag} ${pad('model: claude haiku 4.5', col)} ${mdlDetail}`
+  )
+}
+
+const FALLBACK: Readiness = {
+  status: 'error',
+  knowledge_base: { status: 'error', detail: 'unavailable' },
+  model: { status: 'error', detail: 'unavailable' },
+}
+
+type Props = { onComplete: () => void }
 
 export function BootupBanner({ onComplete }: Props) {
   const [text, setText] = useState('')
   const [done, setDone] = useState(false)
   const doneRef = useRef(false)
-  // keep a stable ref to onComplete so finish() never changes identity
   const onCompleteRef = useRef(onComplete)
   onCompleteRef.current = onComplete
 
   const finish = useCallback(() => {
     if (doneRef.current) return
     doneRef.current = true
-    setText(BANNER_TEXT)
     setDone(true)
     onCompleteRef.current()
-  }, []) // stable — no deps
+  }, [])
 
   useEffect(() => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    const fetchReadiness = fetch('/api/readiness', {
+      signal: AbortSignal.timeout(15_000),
+    })
+      .then((r) => r.json() as Promise<Readiness>)
+      .catch(() => FALLBACK)
+
     if (reducedMotion) {
-      finish()
+      fetchReadiness.then((r) => {
+        setText(HEADER + buildChecks(r) + TAGLINE)
+        finish()
+      })
       return
     }
 
+    // Drip header immediately; when fetch resolves (whenever that is), enqueue
+    // checks + tagline into the same queue. finish() is only called after the
+    // queue fully drains AND all content has been enqueued.
+    let allEnqueued = false
     const drip = new DripQueue(
       (char) => setText((prev) => prev + char),
-      finish,
+      () => { if (allEnqueued) finish() },
     )
-    drip.enqueue(BANNER_TEXT)
+
+    drip.enqueue(HEADER)
+
+    fetchReadiness.then((r) => {
+      drip.enqueue(buildChecks(r) + TAGLINE)
+      allEnqueued = true
+    })
 
     return () => drip.destroy()
-  }, [finish]) // finish is stable, this runs exactly once
+  }, [finish])
 
   return (
     <div className="w-full py-4">
