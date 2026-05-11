@@ -1,5 +1,6 @@
-node_modules/
-.next/
+.git
+.github
 .env*
-.git/
-*.md
+node_modules
+.next
+tsconfig.tsbuildinfo
