@@ -153,7 +153,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
     }
   }, [])
 
-  const showPrompts = messages.length <= 1 && !streaming
+  const showPrompts = !streaming
 
   return (
     <div className="flex flex-col h-screen max-w-4xl mx-auto p-4 gap-2">
@@ -200,7 +200,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
 
       {showPrompts && <SuggestedPrompts onSelect={(p) => submit(p)} disabled={streaming} />}
 
-      <div className="flex gap-2 border-t border-gray-800 pt-2">
+      <div className="flex gap-2 border-t border-gray-800 pt-2 items-center">
         <span className="text-green-400">❯</span>
         <input
           className="flex-1 bg-transparent outline-none text-gray-200 caret-green-400"
@@ -211,6 +211,16 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
           autoFocus
           placeholder={streaming ? '' : !bannerDone ? '' : 'Ask about Mark…'}
         />
+        <button
+          onClick={() => submit()}
+          disabled={streaming || !bannerDone || !input.trim()}
+          className="flex-shrink-0 w-7 h-7 rounded-full bg-green-500 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-green-400 transition-colors"
+          aria-label="Send"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+            <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
+          </svg>
+        </button>
       </div>
     </div>
   )

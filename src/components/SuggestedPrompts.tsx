@@ -4,6 +4,7 @@ const PROMPTS = [
   "Tell me about Mark's Thesis",
   "What's Mark's strongest AI work?",
   'How do I reach Mark?',
+  'Does Mark know how to play backgammon?',
 ]
 
 type Props = {
