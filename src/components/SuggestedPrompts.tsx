@@ -1,10 +1,9 @@
 'use client'
 
 const PROMPTS = [
-  'Tell me about Tutor-AI',
+  "Tell me about Mark's Thesis",
   "What's Mark's strongest AI work?",
   'How do I reach Mark?',
-  'What has Mark built recently?',
 ]
 
 type Props = {

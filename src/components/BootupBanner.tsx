@@ -26,18 +26,21 @@ type Props = {
 
 export function BootupBanner({ onComplete }: Props) {
   const [text, setText] = useState('')
-  const dripRef = useRef<DripQueue | null>(null)
+  const [done, setDone] = useState(false)
   const doneRef = useRef(false)
+  // keep a stable ref to onComplete so finish() never changes identity
+  const onCompleteRef = useRef(onComplete)
+  onCompleteRef.current = onComplete
 
   const finish = useCallback(() => {
     if (doneRef.current) return
     doneRef.current = true
     setText(BANNER_TEXT)
-    onComplete()
-  }, [onComplete])
+    setDone(true)
+    onCompleteRef.current()
+  }, []) // stable — no deps
 
   useEffect(() => {
-    // Respect prefers-reduced-motion — render instantly
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reducedMotion) {
       finish()
@@ -48,31 +51,16 @@ export function BootupBanner({ onComplete }: Props) {
       (char) => setText((prev) => prev + char),
       finish,
     )
-    dripRef.current = drip
     drip.enqueue(BANNER_TEXT)
 
     return () => drip.destroy()
-  }, [finish])
-
-  // Skip on click or any keydown
-  useEffect(() => {
-    const skip = () => {
-      dripRef.current?.destroy()
-      finish()
-    }
-    window.addEventListener('click', skip, { once: true })
-    window.addEventListener('keydown', skip, { once: true })
-    return () => {
-      window.removeEventListener('click', skip)
-      window.removeEventListener('keydown', skip)
-    }
-  }, [finish])
+  }, [finish]) // finish is stable, this runs exactly once
 
   return (
-    <div className="min-h-screen p-8">
+    <div className="w-full py-4">
       <pre className="text-green-400 text-sm leading-relaxed whitespace-pre-wrap font-mono">
         {text}
-        <span className="animate-pulse">▋</span>
+        {!done && <span className="animate-pulse">▋</span>}
       </pre>
     </div>
   )

@@ -3,6 +3,9 @@
 @tailwind utilities;
 
 body {
-  background: #0a0a0a;
+  background: #1c1c1c;
   color: #d4d4d4;
 }
+
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }

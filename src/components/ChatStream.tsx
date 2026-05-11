@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { streamChat } from '@/lib/sse'
 import { DripQueue } from '@/lib/drip'
 import { saveMessages } from '@/lib/sessionStore'
 import { SuggestedPrompts } from './SuggestedPrompts'
+import { BootupBanner } from './BootupBanner'
 import type { SSEEvent } from '@/lib/sse-events'
 
 type Message = { role: 'user' | 'assistant'; content: string }
@@ -12,6 +14,8 @@ type RetrievalStatus = 'retrieving' | 'searching' | 'synthesizing' | null
 
 type Props = {
   initialMessages?: Message[]
+  showBanner?: boolean
+  postBannerMessages?: Message[]
 }
 
 // Commands that should render immediately without char-by-char drip
@@ -21,12 +25,14 @@ function isSlashCommand(text: string): boolean {
   return SLASH_PATTERN.test(text)
 }
 
-export function ChatStream({ initialMessages = [] }: Props) {
+export function ChatStream({ initialMessages = [], showBanner = false, postBannerMessages }: Props) {
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [input, setInput] = useState('')
   const [status, setStatus] = useState<RetrievalStatus>(null)
   const [streaming, setStreaming] = useState(false)
   const [citations, setCitations] = useState<string[]>([])
+  const [bannerDone, setBannerDone] = useState(!showBanner)
+  const postBannerRef = useRef(postBannerMessages)
   const dripRef = useRef<DripQueue | null>(null)
   const assistantBufRef = useRef('')
   const isSlashRef = useRef(false)
@@ -84,7 +90,6 @@ export function ChatStream({ initialMessages = [] }: Props) {
         handleEvent(event, drip)
       }
     } catch {
-      // Network drop mid-stream: flush whatever arrived, re-enable input
       drip.flush()
       assistantBufRef.current += assistantBufRef.current ? '\n\n[Connection lost]' : '[Connection lost]'
       setMessages((prev) => {
@@ -104,7 +109,6 @@ export function ChatStream({ initialMessages = [] }: Props) {
         break
       case 'delta':
         if (isSlashRef.current) {
-          // Slash commands: render immediately, no char-by-char drip
           appendDirect(event.text)
         } else {
           drip.enqueue(event.text)
@@ -114,7 +118,6 @@ export function ChatStream({ initialMessages = [] }: Props) {
         setCitations(event.sources.map((s) => s.title))
         break
       case 'action':
-        // cat resume.pdf → trigger download or new-tab open
         if (event.action_type === 'download') {
           const a = document.createElement('a')
           a.href = event.url
@@ -143,19 +146,41 @@ export function ChatStream({ initialMessages = [] }: Props) {
 
   useEffect(() => () => dripRef.current?.destroy(), [])
 
+  const handleBannerComplete = useCallback(() => {
+    setBannerDone(true)
+    if (postBannerRef.current?.length) {
+      setMessages(postBannerRef.current)
+    }
+  }, [])
+
   const showPrompts = messages.length <= 1 && !streaming
 
   return (
-    <div className="flex flex-col h-screen max-w-2xl mx-auto p-4 gap-2">
-      <div className="flex-1 overflow-y-auto flex flex-col gap-3 pb-2">
+    <div className="flex flex-col h-screen max-w-4xl mx-auto p-4 gap-2">
+      <div className="flex-1 overflow-y-auto scrollbar-none flex flex-col gap-3 pb-2">
+        {showBanner && (
+          <BootupBanner onComplete={handleBannerComplete} />
+        )}
         {messages.map((msg, i) => (
           <div key={i}>
             <span className="text-gray-500">
               {msg.role === 'user' ? '> ' : '$ '}
             </span>
-            <span className={msg.role === 'user' ? 'text-green-400' : 'text-gray-200'}>
-              {msg.content}
-            </span>
+            {msg.role === 'assistant' ? (
+              <span className="prose prose-invert prose-sm max-w-none align-top">
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+                    pre: ({ children }) => <pre className="bg-transparent p-0">{children}</pre>,
+                    code: ({ children }) => <code className="text-green-300 font-mono">{children}</code>,
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
+              </span>
+            ) : (
+              <span className="text-green-400">{msg.content}</span>
+            )}
             {msg.role === 'assistant' && i === messages.length - 1 && citations.length > 0 && (
               <div className="mt-1 text-xs text-gray-500 pl-4">
                 Sources: {citations.join(', ')}
@@ -182,9 +207,9 @@ export function ChatStream({ initialMessages = [] }: Props) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
-          disabled={streaming}
+          disabled={streaming || !bannerDone}
           autoFocus
-          placeholder={streaming ? '' : 'Ask about Mark…'}
+          placeholder={streaming ? '' : !bannerDone ? '' : 'Ask about Mark…'}
         />
       </div>
     </div>
