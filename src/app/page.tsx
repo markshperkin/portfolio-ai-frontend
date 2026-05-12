@@ -10,10 +10,10 @@ const ANNOUNCEMENT: StoredMessage = {
   content: `Ask me about Mark in plain English.
 
 You can also run slash commands:
-  whoami          → what I am
-  /help           → all commands
-  sudo hire-mark  → Mark's contact info
-  cat resume.pdf  → download his résumé`,
+- \`whoami\` → what I am
+- \`/help\` → all commands
+- \`sudo hire-mark\` → Mark's contact info
+- \`cat resume.pdf\` → download his résumé`,
 }
 
 type Phase = 'loading' | 'chat'
