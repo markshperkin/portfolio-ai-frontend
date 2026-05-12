@@ -32,7 +32,7 @@ export class DripQueue {
       return
     }
     // Emit extra chars per tick when queue is large so we never fall behind
-    const batch = Math.max(1, Math.ceil(this.queue.length / 80))
+    const batch = Math.min(2, Math.max(1, Math.ceil(this.queue.length / 80)))
     for (let i = 0; i < batch && this.queue.length > 0; i++) {
       this.onChar(this.queue.shift()!)
     }
