@@ -70,7 +70,7 @@ export function BootupBanner({ onComplete }: Props) {
   useEffect(() => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-    const fetchReadiness = fetch('/api/readiness', {
+    const fetchReadiness = fetch('/api/health', {
       signal: AbortSignal.timeout(15_000),
     })
       .then((r) => {
