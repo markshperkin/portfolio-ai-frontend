@@ -51,11 +51,30 @@ const FALLBACK: Readiness = {
   model: { status: 'error', detail: 'unavailable' },
 }
 
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+
+function SpinnerLines() {
+  const [frame, setFrame] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setFrame((f) => (f + 1) % SPINNER_FRAMES.length), 80)
+    return () => clearInterval(t)
+  }, [])
+  const s = SPINNER_FRAMES[frame]
+  return (
+    <span>
+      {'\n\n'}
+      {s} RAG knowledge base{'\n'}
+      {s} model: claude haiku 4.5
+    </span>
+  )
+}
+
 type Props = { onComplete: () => void }
 
 export function BootupBanner({ onComplete }: Props) {
   const [text, setText] = useState('')
   const [done, setDone] = useState(false)
+  const [fetchPending, setFetchPending] = useState(false)
   const doneRef = useRef(false)
   const onCompleteRef = useRef(onComplete)
   onCompleteRef.current = onComplete
@@ -68,7 +87,15 @@ export function BootupBanner({ onComplete }: Props) {
   }, [])
 
   useEffect(() => {
+    // Reset for StrictMode double-invoke — each run starts clean
+    setText('')
+    setDone(false)
+    setFetchPending(false)
+    doneRef.current = false
+
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    let cancelled = false
 
     const fetchReadiness = fetch('/api/health', {
       signal: AbortSignal.timeout(15_000),
@@ -81,36 +108,60 @@ export function BootupBanner({ onComplete }: Props) {
 
     if (reducedMotion) {
       fetchReadiness.then((r) => {
+        if (cancelled) return
         setText(HEADER + buildChecks(r) + TAGLINE)
         finish()
       })
-      return
+      return () => { cancelled = true }
     }
 
-    // Drip header immediately; when fetch resolves (whenever that is), enqueue
-    // checks + tagline into the same queue. finish() is only called after the
-    // queue fully drains AND all content has been enqueued.
-    let allEnqueued = false
-    const drip = new DripQueue(
+    // drip2 handles checks + tagline after fetch resolves
+    const drip2 = new DripQueue(
       (char) => setText((prev) => prev + char),
-      () => { if (allEnqueued) finish() },
+      () => finish(),
     )
 
-    drip.enqueue(HEADER)
+    // fetchResult and headerDone coordinate between drip1's onDrain and the fetch callback
+    let fetchResult: Readiness | null = null
+    let headerDone = false
+
+    const drip1 = new DripQueue(
+      (char) => setText((prev) => prev + char),
+      () => {
+        headerDone = true
+        if (fetchResult) {
+          drip2.enqueue(buildChecks(fetchResult) + TAGLINE)
+        } else {
+          setFetchPending(true)
+        }
+      },
+    )
+
+    drip1.enqueue(HEADER)
 
     fetchReadiness.then((r) => {
-      drip.enqueue(buildChecks(r) + TAGLINE)
-      allEnqueued = true
+      if (cancelled) return
+      fetchResult = r
+      if (headerDone) {
+        setFetchPending(false)
+        drip2.enqueue(buildChecks(r) + TAGLINE)
+      }
+      // else: drip1's onDrain will pick up fetchResult and start drip2
     })
 
-    return () => drip.destroy()
+    return () => {
+      cancelled = true
+      drip1.destroy()
+      drip2.destroy()
+    }
   }, [finish])
 
   return (
     <div className="w-full py-4">
       <pre className="text-green-400 text-sm leading-relaxed whitespace-pre-wrap font-mono">
         {text}
-        {!done && <span className="animate-pulse">▋</span>}
+        {fetchPending && <SpinnerLines />}
+        {!done && !fetchPending && <span className="animate-pulse">▋</span>}
       </pre>
     </div>
   )
