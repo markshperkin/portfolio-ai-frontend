@@ -27,10 +27,8 @@ export default function Home() {
     const saved = loadMessages()
     if (saved.length > 0) {
       setInitialMessages(saved)
-      setShowBanner(false)
-    } else {
-      setShowBanner(true)
     }
+    setShowBanner(true)
     setPhase('chat')
   }, [])
 
