@@ -1,4 +1,4 @@
-export type StoredMessage = { role: 'user' | 'assistant'; content: string }
+export type StoredMessage = { role: 'user' | 'assistant'; content: string; citations?: string[] }
 
 const KEY = 'marks_gpt_messages'
 
