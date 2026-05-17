@@ -49,7 +49,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
     assistantBufRef.current += char
     setMessages((prev) => {
       const next = [...prev]
-      next[next.length - 1] = { role: 'assistant', content: assistantBufRef.current }
+      next[next.length - 1] = { ...next[next.length - 1], content: assistantBufRef.current }
       return next
     })
   }
@@ -58,7 +58,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
     assistantBufRef.current += text
     setMessages((prev) => {
       const next = [...prev]
-      next[next.length - 1] = { role: 'assistant', content: assistantBufRef.current }
+      next[next.length - 1] = { ...next[next.length - 1], content: assistantBufRef.current }
       return next
     })
   }
@@ -92,7 +92,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
       assistantBufRef.current += assistantBufRef.current ? '\n\n[Connection lost]' : '[Connection lost]'
       setMessages((prev) => {
         const next = [...prev]
-        next[next.length - 1] = { role: 'assistant', content: assistantBufRef.current }
+        next[next.length - 1] = { ...next[next.length - 1], content: assistantBufRef.current }
         return next
       })
       setStreaming(false)
