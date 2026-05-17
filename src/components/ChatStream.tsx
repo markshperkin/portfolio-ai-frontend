@@ -9,7 +9,7 @@ import { SuggestedPrompts } from './SuggestedPrompts'
 import { BootupBanner } from './BootupBanner'
 import type { SSEEvent } from '@/lib/sse-events'
 
-type Message = { role: 'user' | 'assistant'; content: string }
+type Message = { role: 'user' | 'assistant'; content: string; citations?: string[] }
 type RetrievalStatus = 'retrieving' | 'searching' | 'synthesizing' | null
 
 type Props = {
@@ -30,7 +30,6 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
   const [input, setInput] = useState('')
   const [status, setStatus] = useState<RetrievalStatus>(null)
   const [streaming, setStreaming] = useState(false)
-  const [citations, setCitations] = useState<string[]>([])
   const [bannerDone, setBannerDone] = useState(!showBanner)
   const postBannerRef = useRef(postBannerMessages)
   const dripRef = useRef<DripQueue | null>(null)
@@ -70,7 +69,6 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
     setInput('')
     setStreaming(true)
     setStatus(null)
-    setCitations([])
     assistantBufRef.current = ''
     isSlashRef.current = isSlashCommand(content)
 
@@ -115,7 +113,11 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
         }
         break
       case 'citation':
-        setCitations(event.sources.map((s) => s.title))
+        setMessages((prev) => {
+          const next = [...prev]
+          next[next.length - 1] = { ...next[next.length - 1], citations: event.sources.map((s) => s.title) }
+          return next
+        })
         break
       case 'action':
         if (event.action_type === 'download') {
@@ -181,9 +183,9 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
             ) : (
               <span className="text-green-400">{msg.content}</span>
             )}
-            {msg.role === 'assistant' && i === messages.length - 1 && citations.length > 0 && (
+            {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && (
               <div className="mt-1 text-xs text-gray-500 pl-4">
-                Sources: {citations.join(', ')}
+                Sources: {msg.citations.join(', ')}
               </div>
             )}
           </div>
