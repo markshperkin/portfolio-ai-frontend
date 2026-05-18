@@ -30,6 +30,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
   const [input, setInput] = useState('')
   const [status, setStatus] = useState<RetrievalStatus>(null)
   const [streaming, setStreaming] = useState(false)
+  const [currentModel, setCurrentModel] = useState<'haiku' | 'sonnet' | null>(null)
   const [bannerDone, setBannerDone] = useState(!showBanner)
   const postBannerRef = useRef(postBannerMessages)
   const dripRef = useRef<DripQueue | null>(null)
@@ -69,6 +70,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
     setInput('')
     setStreaming(true)
     setStatus(null)
+    setCurrentModel(null)
     assistantBufRef.current = ''
     isSlashRef.current = isSlashCommand(content)
 
@@ -118,6 +120,9 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
           next[next.length - 1] = { ...next[next.length - 1], citations: event.sources.map((s) => s.title) }
           return next
         })
+        break
+      case 'model':
+        setCurrentModel(event.model)
         break
       case 'action':
         if (event.action_type === 'download') {
@@ -201,6 +206,10 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
       </div>
 
       {showPrompts && <SuggestedPrompts onSelect={(p) => submit(p)} disabled={streaming} />}
+
+      {currentModel === 'sonnet' && (
+        <div className="text-xs text-yellow-600">haiku unavailable — using sonnet 4.6</div>
+      )}
 
       <div className="flex gap-2 border-t border-gray-800 pt-2 items-center">
         <span className="text-green-400">❯</span>
