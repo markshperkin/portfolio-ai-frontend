@@ -29,19 +29,27 @@ function pad(label: string, width: number) {
   return label + ' ' + '.'.repeat(Math.max(1, width - label.length - 1))
 }
 
+function modelLine(mdl: CheckResult, col: number): string {
+  if (mdl.status === 'error') {
+    return `[ FAIL ] ${pad('model: haiku down, sonnet down', col)} unavailable`
+  }
+  if (mdl.detail === 'sonnet') {
+    return `[ WARN ] ${pad('model: claude haiku down', col)} claude sonnet ready`
+  }
+  return `[  OK  ] ${pad('model: claude haiku 4.5', col)} ready`
+}
+
 function buildChecks(r: Readiness): string {
   const kb = r.knowledge_base
   const mdl = r.model
   const col = 32
   const kbTag = kb.status === 'ok' ? '[  OK  ]' : '[ FAIL ]'
   const kbDetail = kb.status === 'ok' ? `online — ${kb.detail} chunks` : kb.detail
-  const mdlTag = mdl.status === 'ok' ? '[  OK  ]' : '[ FAIL ]'
-  const mdlDetail = mdl.status === 'ok' ? 'ready' : mdl.detail
 
   return (
     '\n\n' +
     `${kbTag} ${pad('RAG knowledge base', col)} ${kbDetail}\n` +
-    `${mdlTag} ${pad('model: claude haiku 4.5', col)} ${mdlDetail}`
+    modelLine(mdl, col)
   )
 }
 
@@ -64,7 +72,7 @@ function SpinnerLines() {
     <span>
       {'\n\n'}
       {s} RAG knowledge base{'\n'}
-      {s} model: claude haiku 4.5
+      {s} model
     </span>
   )
 }
