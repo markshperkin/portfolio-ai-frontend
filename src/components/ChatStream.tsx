@@ -74,7 +74,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
 
     const userMsg: Message = { role: 'user', content }
     const sendableHistory = messages.filter((m) => m.role !== 'assistant' || m.content.length > 0)
-    const history = [...sendableHistory, userMsg]
+    const history = [...sendableHistory, userMsg].slice(-8)
     setMessages([...messages, userMsg, { role: 'assistant', content: '' }])
 
     const drip = new DripQueue(appendChar, () => {
