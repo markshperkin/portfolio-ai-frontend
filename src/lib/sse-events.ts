@@ -37,6 +37,11 @@ export type ActionEvent = {
   url: string
 }
 
+export type ModelEvent = {
+  type: 'model'
+  model: 'haiku' | 'sonnet'
+}
+
 export type SSEEvent =
   | RetrievalStepEvent
   | DeltaEvent
@@ -44,3 +49,4 @@ export type SSEEvent =
   | DoneEvent
   | ErrorEvent
   | ActionEvent
+  | ModelEvent
