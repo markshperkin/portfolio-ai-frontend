@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { streamChat } from '@/lib/sse'
 import { DripQueue } from '@/lib/drip'
@@ -10,7 +10,7 @@ import { BootupBanner } from './BootupBanner'
 import type { SSEEvent } from '@/lib/sse-events'
 
 type Message = { role: 'user' | 'assistant'; content: string; citations?: string[] }
-type RetrievalStatus = 'retrieving' | 'searching' | 'synthesizing' | null
+type RetrievalStatus = 'extracting' | 'retrieving' | 'searching' | 'synthesizing' | null
 
 type Props = {
   initialMessages?: Message[]
@@ -18,12 +18,15 @@ type Props = {
   postBannerMessages?: Message[]
 }
 
-// Commands that should render immediately without char-by-char drip
-const SLASH_PATTERN = /^\s*(whoami|\/help|sudo\s+hire-?mark|cat\s+resume\.pdf)\s*[.!?]?\s*$/i
-
+// Anything starting with / renders immediately without char-by-char drip
 function isSlashCommand(text: string): boolean {
-  return SLASH_PATTERN.test(text)
+  return /^\s*\//.test(text)
 }
+
+const LINE_HEIGHT_PX = 24
+const MAX_TEXTAREA_LINES = 5
+const PASTE_CHIP_LINE_THRESHOLD = 5
+const PASTE_CHIP_CHAR_THRESHOLD = 400
 
 export function ChatStream({ initialMessages = [], showBanner = false, postBannerMessages }: Props) {
   const [messages, setMessages] = useState<Message[]>(initialMessages)
@@ -36,6 +39,19 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
   const assistantBufRef = useRef('')
   const isSlashRef = useRef(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const pasteMapRef = useRef<Map<string, string>>(new Map())
+  const pasteCountRef = useRef(0)
+
+  // Auto-grow textarea up to MAX_TEXTAREA_LINES, then scroll
+  useLayoutEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    const maxHeight = LINE_HEIGHT_PX * MAX_TEXTAREA_LINES
+    el.style.height = Math.min(el.scrollHeight, maxHeight) + 'px'
+    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden'
+  }, [input])
 
   useEffect(() => {
     if (messages.length > 0) saveMessages(messages)
@@ -63,18 +79,29 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
     })
   }
 
+  const expandPastes = (text: string): string => {
+    let result = text
+    pasteMapRef.current.forEach((value, key) => {
+      result = result.split(key).join(value)
+    })
+    return result
+  }
+
   const submit = async (text?: string) => {
-    const content = (text ?? input).trim()
-    if (!content || streaming) return
+    const raw = (text ?? input).trim()
+    if (!raw || streaming) return
+    const content = expandPastes(raw)
     setInput('')
+    pasteMapRef.current.clear()
+    pasteCountRef.current = 0
     setStreaming(true)
     setStatus(null)
     assistantBufRef.current = ''
     isSlashRef.current = isSlashCommand(content)
 
-    const userMsg: Message = { role: 'user', content }
+    const userMsg: Message = { role: 'user', content: raw }
     const sendableHistory = messages.filter((m) => m.role !== 'assistant' || m.content.length > 0)
-    const history = [...sendableHistory, userMsg].slice(-8)
+    const history = [...sendableHistory, { role: 'user' as const, content }].slice(-8)
     setMessages([...messages, userMsg, { role: 'assistant', content: '' }])
 
     const drip = new DripQueue(appendChar, () => {
@@ -103,7 +130,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
   const handleEvent = (event: SSEEvent, drip: DripQueue) => {
     switch (event.type) {
       case 'retrieval_step':
-        setStatus(event.step)
+        setStatus(event.step as RetrievalStatus)
         break
       case 'delta':
         if (isSlashRef.current) {
@@ -155,6 +182,30 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
     }
   }, [])
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const text = e.clipboardData.getData('text')
+    const lines = text.split('\n')
+    if (lines.length > PASTE_CHIP_LINE_THRESHOLD || text.length > PASTE_CHIP_CHAR_THRESHOLD) {
+      e.preventDefault()
+      pasteCountRef.current += 1
+      const token = `[Pasted #${pasteCountRef.current}: ${lines.length} lines]`
+      pasteMapRef.current.set(token, text)
+      const el = textareaRef.current
+      if (el) {
+        const start = el.selectionStart
+        const end = el.selectionEnd
+        setInput((prev) => prev.slice(0, start) + token + prev.slice(end))
+        // Restore cursor after token
+        requestAnimationFrame(() => {
+          el.selectionStart = start + token.length
+          el.selectionEnd = start + token.length
+        })
+      } else {
+        setInput((prev) => prev + token)
+      }
+    }
+  }
+
   const showPrompts = !streaming
 
   return (
@@ -181,7 +232,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
                 </ReactMarkdown>
               </span>
             ) : (
-              <span className="text-green-400">{msg.content}</span>
+              <span className="text-green-400 whitespace-pre-wrap">{msg.content}</span>
             )}
             {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && (
               <div className="mt-1 text-xs text-gray-500 pl-4">
@@ -192,6 +243,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
         ))}
         {status && (
           <div className="text-yellow-600 text-sm animate-pulse">
+            {status === 'extracting' && 'Extracting requirements…'}
             {status === 'retrieving' && 'Retrieving…'}
             {status === 'searching' && 'Looking in knowledge base…'}
             {status === 'synthesizing' && 'Synthesizing…'}
@@ -202,13 +254,21 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
 
       {showPrompts && <SuggestedPrompts onSelect={(p) => submit(p)} disabled={streaming} />}
 
-      <div className="flex gap-2 border-t border-gray-800 pt-2 items-center">
-        <span className="text-green-400">❯</span>
-        <input
-          className="flex-1 bg-transparent outline-none text-gray-200 caret-green-400"
+      <div className="flex gap-2 border-t border-gray-800 pt-2 items-end">
+        <span className="text-green-400 pb-1">❯</span>
+        <textarea
+          ref={textareaRef}
+          rows={1}
+          className="flex-1 bg-transparent outline-none text-gray-200 caret-green-400 resize-none leading-6 scrollbar-none"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              submit()
+            }
+          }}
+          onPaste={handlePaste}
           disabled={streaming || !bannerDone}
           autoFocus
           placeholder={streaming ? '' : !bannerDone ? '' : 'Ask about Mark…'}
@@ -216,7 +276,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
         <button
           onClick={() => submit()}
           disabled={streaming || !bannerDone || !input.trim()}
-          className="flex-shrink-0 w-7 h-7 rounded-full bg-green-500 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-green-400 transition-colors"
+          className="flex-shrink-0 w-7 h-7 mb-0.5 rounded-full bg-green-500 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-green-400 transition-colors"
           aria-label="Send"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
