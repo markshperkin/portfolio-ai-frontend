@@ -18,9 +18,29 @@ type Props = {
   postBannerMessages?: Message[]
 }
 
+const COMMANDS = [
+  { name: '/whoami',    description: 'What I am' },
+  { name: '/help',      description: 'All commands' },
+  { name: '/hire-mark', description: "Mark's contact info" },
+  { name: '/resume',    description: 'Download résumé' },
+  { name: '/jdfit',     description: 'Paste a JD → fit report' },
+]
+
 // Anything starting with / renders immediately without char-by-char drip
 function isSlashCommand(text: string): boolean {
   return /^\s*\//.test(text)
+}
+
+function getGhostSuffix(input: string): string {
+  if (!input.startsWith('/')) return ''
+  const lower = input.toLowerCase()
+  const match = COMMANDS.find((c) => c.name.startsWith(lower) && c.name !== lower)
+  return match ? match.name.slice(input.length) : ''
+}
+
+function isCommandRecognized(input: string): boolean {
+  const lower = input.trim().toLowerCase()
+  return COMMANDS.some((c) => lower === c.name || lower.startsWith(c.name + ' '))
 }
 
 const LINE_HEIGHT_PX = 24
@@ -256,23 +276,45 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
 
       <div className="flex gap-2 border-t border-gray-800 pt-2 items-end">
         <span className="text-green-400 pb-1">❯</span>
-        <textarea
-          ref={textareaRef}
-          rows={1}
-          className="flex-1 bg-transparent outline-none text-gray-200 caret-green-400 resize-none leading-6 scrollbar-none"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              submit()
-            }
-          }}
-          onPaste={handlePaste}
-          disabled={streaming || !bannerDone}
-          autoFocus
-          placeholder={streaming ? '' : !bannerDone ? '' : 'Ask about Mark…'}
-        />
+        <div className="relative flex-1">
+          {/* ghost autocomplete layer */}
+          {getGhostSuffix(input) && (
+            <div
+              aria-hidden
+              className="absolute inset-0 pointer-events-none whitespace-pre-wrap break-words text-sm leading-6 font-mono overflow-hidden"
+            >
+              <span style={{ color: 'transparent' }}>{input}</span>
+              <span className="text-gray-600">{getGhostSuffix(input)}</span>
+            </div>
+          )}
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            className={`w-full bg-transparent outline-none caret-green-400 resize-none leading-6 scrollbar-none ${
+              isCommandRecognized(input) ? 'text-blue-400' : 'text-gray-200'
+            }`}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Tab') {
+                const ghost = getGhostSuffix(input)
+                if (ghost) {
+                  e.preventDefault()
+                  setInput(input + ghost)
+                  return
+                }
+              }
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                submit()
+              }
+            }}
+            onPaste={handlePaste}
+            disabled={streaming || !bannerDone}
+            autoFocus
+            placeholder={streaming ? '' : !bannerDone ? '' : 'Ask about Mark…'}
+          />
+        </div>
         <button
           onClick={() => submit()}
           disabled={streaming || !bannerDone || !input.trim()}
