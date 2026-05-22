@@ -43,6 +43,11 @@ function isCommandRecognized(input: string): boolean {
   return COMMANDS.some((c) => lower === c.name || lower.startsWith(c.name + ' '))
 }
 
+function getCommandMatch(input: string) {
+  const lower = input.trim().toLowerCase()
+  return COMMANDS.find((c) => lower === c.name || lower.startsWith(c.name + ' ')) ?? null
+}
+
 const LINE_HEIGHT_PX = 24
 const MAX_TEXTAREA_LINES = 5
 const PASTE_CHIP_LINE_THRESHOLD = 5
@@ -277,21 +282,28 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
       <div className="flex gap-2 border-t border-gray-800 pt-2 items-end">
         <span className="text-green-400 pb-1">❯</span>
         <div className="relative flex-1">
-          {/* ghost autocomplete layer */}
-          {getGhostSuffix(input) && (
+          {/* color + ghost overlay */}
+          {(getCommandMatch(input) || getGhostSuffix(input)) && (
             <div
               aria-hidden
               className="absolute inset-0 pointer-events-none whitespace-pre-wrap break-words text-sm leading-6 font-mono overflow-hidden"
             >
-              <span style={{ color: 'transparent' }}>{input}</span>
-              <span className="text-gray-600">{getGhostSuffix(input)}</span>
+              {getCommandMatch(input) ? (
+                <>
+                  <span className="text-blue-400">{input.slice(0, getCommandMatch(input)!.name.length)}</span>
+                  <span className="text-gray-200">{input.slice(getCommandMatch(input)!.name.length)}</span>
+                </>
+              ) : (
+                <span style={{ color: 'transparent' }}>{input}</span>
+              )}
+              {getGhostSuffix(input) && <span className="text-gray-600">{getGhostSuffix(input)}</span>}
             </div>
           )}
           <textarea
             ref={textareaRef}
             rows={1}
-            className={`w-full bg-transparent outline-none caret-green-400 resize-none leading-6 scrollbar-none ${
-              isCommandRecognized(input) ? 'text-blue-400' : 'text-gray-200'
+            className={`w-full bg-transparent outline-none caret-green-400 resize-none leading-6 scrollbar-none text-sm font-mono ${
+              getCommandMatch(input) ? 'text-transparent' : 'text-gray-200'
             }`}
             value={input}
             onChange={(e) => setInput(e.target.value)}
