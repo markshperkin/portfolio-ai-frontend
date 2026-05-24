@@ -290,6 +290,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
         {status && (
           <StatusSpinner status={status} />
         )}
+        {!streaming && bannerDone && <span className="animate-blink text-gray-600 font-mono">|</span>}
         <div ref={bottomRef} />
       </div>
 
