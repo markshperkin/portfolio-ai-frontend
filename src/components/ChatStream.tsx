@@ -48,6 +48,28 @@ function getCommandMatch(input: string) {
   return COMMANDS.find((c) => lower === c.name || lower.startsWith(c.name + ' ')) ?? null
 }
 
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+
+const STATUS_LABELS: Record<string, string> = {
+  extracting: 'Extracting requirements…',
+  retrieving: 'Retrieving…',
+  searching: 'Looking in knowledge base…',
+  synthesizing: 'Synthesizing…',
+}
+
+function StatusSpinner({ status }: { status: string }) {
+  const [frame, setFrame] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setFrame((f) => (f + 1) % SPINNER_FRAMES.length), 80)
+    return () => clearInterval(t)
+  }, [])
+  return (
+    <div className="text-yellow-600 text-sm font-mono">
+      {SPINNER_FRAMES[frame]} {STATUS_LABELS[status] ?? status}
+    </div>
+  )
+}
+
 const LINE_HEIGHT_PX = 24
 const MAX_TEXTAREA_LINES = 5
 const PASTE_CHIP_LINE_THRESHOLD = 5
@@ -240,7 +262,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
           <BootupBanner onComplete={handleBannerComplete} />
         )}
         {messages.map((msg, i) => (
-          <div key={i}>
+          <div key={i} className={msg.role === 'assistant' ? 'border-l-2 border-green-900 bg-green-950/10 pl-3 py-0.5 rounded-r' : ''}>
             <span className="text-gray-500">
               {msg.role === 'user' ? '> ' : '$ '}
             </span>
@@ -260,26 +282,25 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
               <span className="text-green-400 whitespace-pre-wrap">{msg.content}</span>
             )}
             {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && (
-              <div className="mt-1 text-xs text-gray-500 pl-4">
-                Sources: {msg.citations.join(', ')}
+              <div className="mt-1 flex flex-wrap gap-1">
+                {msg.citations.map((c) => (
+                  <span key={c} className="text-xs border border-gray-700 text-gray-500 px-2 py-0.5 rounded">
+                    {c}
+                  </span>
+                ))}
               </div>
             )}
           </div>
         ))}
         {status && (
-          <div className="text-yellow-600 text-sm animate-pulse">
-            {status === 'extracting' && 'Extracting requirements…'}
-            {status === 'retrieving' && 'Retrieving…'}
-            {status === 'searching' && 'Looking in knowledge base…'}
-            {status === 'synthesizing' && 'Synthesizing…'}
-          </div>
+          <StatusSpinner status={status} />
         )}
         <div ref={bottomRef} />
       </div>
 
       {showPrompts && <SuggestedPrompts onSelect={(p) => submit(p)} disabled={streaming} />}
 
-      <div className="flex gap-2 border-t border-gray-800 pt-2 items-end">
+      <div className="flex gap-2 border-t border-gray-700 pt-2 items-end">
         <span className="text-green-400 pb-1">❯</span>
         <div className="relative flex-1">
           {/* color + ghost overlay */}

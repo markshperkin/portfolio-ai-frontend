@@ -22,7 +22,7 @@ export function SuggestedPrompts({ onSelect, disabled }: Props) {
           key={p}
           onClick={() => !disabled && onSelect(p)}
           disabled={disabled}
-          className="text-xs border border-gray-700 text-gray-400 px-3 py-1 rounded hover:border-green-600 hover:text-green-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0 w-[45vw] sm:w-auto text-left"
+          className="text-xs border border-gray-700 bg-gray-800/40 text-gray-400 px-3 py-1 rounded hover:border-green-600 hover:text-green-400 hover:bg-gray-800/70 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex-shrink-0 w-[45vw] sm:w-auto text-left"
         >
           {p}
         </button>
