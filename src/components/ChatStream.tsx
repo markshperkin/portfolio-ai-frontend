@@ -290,7 +290,6 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
         {status && (
           <StatusSpinner status={status} />
         )}
-        {!streaming && bannerDone && <span className="animate-blink text-gray-600 font-mono">|</span>}
         <div ref={bottomRef} />
       </div>
 
@@ -298,6 +297,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
 
       <div className="flex gap-2 border-t border-gray-700 pt-2 items-end">
         <span className="text-green-400 pb-1">❯</span>
+        {!streaming && bannerDone && !input && <span className="animate-blink text-gray-600 font-mono pb-1">|</span>}
         <div className="relative flex-1">
           {/* color + ghost overlay */}
           {(getCommandMatch(input) || getGhostSuffix(input)) && (
