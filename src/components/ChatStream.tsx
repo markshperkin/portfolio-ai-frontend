@@ -263,9 +263,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
         )}
         {messages.map((msg, i) => (
           <div key={i} className={msg.role === 'assistant' ? 'border-l-2 border-green-900 bg-green-950/10 pl-3 py-0.5 rounded-r' : ''}>
-            <span className="text-gray-500">
-              {msg.role === 'user' ? '> ' : '$ '}
-            </span>
+            {msg.role === 'user' && <span className="text-gray-500">{'> '}</span>}
             {msg.role === 'assistant' ? (
               <span className="prose prose-invert prose-sm max-w-none align-top">
                 <ReactMarkdown
@@ -282,12 +280,9 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
               <span className="text-green-400 whitespace-pre-wrap">{msg.content}</span>
             )}
             {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-1">
-                {msg.citations.map((c) => (
-                  <span key={c} className="text-xs border border-gray-700 text-gray-500 px-2 py-0.5 rounded">
-                    {c}
-                  </span>
-                ))}
+              <div className="mt-2">
+                <div className="text-xs text-gray-600 uppercase tracking-wider mb-0.5">Citations</div>
+                <div className="text-xs text-gray-500 italic">{msg.citations.join(' · ')}</div>
               </div>
             )}
           </div>
