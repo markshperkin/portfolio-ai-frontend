@@ -234,7 +234,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
   const showPrompts = !streaming
 
   return (
-    <div className="flex flex-col h-screen max-w-4xl mx-auto p-2 sm:p-4 gap-2">
+    <div className="flex flex-col h-[100dvh] max-w-4xl mx-auto p-2 sm:p-4 gap-2">
       <div className="flex-1 overflow-y-auto scrollbar-none flex flex-col gap-3 pb-2">
         {showBanner && (
           <BootupBanner onComplete={handleBannerComplete} />
