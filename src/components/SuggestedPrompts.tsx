@@ -7,6 +7,8 @@ const PROMPTS = [
   'Does Mark know how to swim?',
   "Tell me about Mark's work ethic.",
   "What are Mark's career goals?",
+  "Tell me about a time Mark delivered something hard under conditions most people would have used as an excuse to ship less. What does that pattern say about how he'd handle pressure on my team?",
+  "What quotes does Mark live by?",
 ]
 
 type Props = {
