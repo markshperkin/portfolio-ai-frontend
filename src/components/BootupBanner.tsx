@@ -166,7 +166,7 @@ export function BootupBanner({ onComplete }: Props) {
 
   return (
     <div className="w-full py-4">
-      <pre className="text-green-400 text-sm leading-relaxed whitespace-pre-wrap font-mono">
+      <pre className="text-green-400 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-mono">
         {text}
         {fetchPending && <SpinnerLines />}
         {!done && !fetchPending && <span className="animate-pulse">▋</span>}

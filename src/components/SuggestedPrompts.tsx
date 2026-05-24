@@ -16,7 +16,7 @@ type Props = {
 
 export function SuggestedPrompts({ onSelect, disabled }: Props) {
   return (
-    <div className="flex flex-wrap gap-2 pb-2">
+    <div className="flex flex-nowrap gap-2 pb-2 overflow-x-auto scrollbar-none sm:flex-wrap">
       {PROMPTS.map((p) => (
         <button
           key={p}
