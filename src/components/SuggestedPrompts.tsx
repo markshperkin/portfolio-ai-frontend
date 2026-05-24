@@ -1,14 +1,12 @@
 'use client'
 
 const PROMPTS = [
-  "Tell me about Mark's Thesis",
-  'How do I reach Mark?',
-  'Does Mark know how to play backgammon?',
-  'Does Mark know how to swim?',
-  "Tell me about Mark's work ethic.",
   "What are Mark's career goals?",
-  "Tell me about a time Mark delivered something hard under conditions most people would have used as an excuse to ship less. What does that pattern say about how he'd handle pressure on my team?",
+  "How does Mark perform under pressure?",
+  "What's the most ambitious thing Mark has shipped end-to-end?",
+  "Tell me about Mark's Thesis",
   "What quotes does Mark live by?",
+  "What did 20 years of competitive swimming teach Mark about engineering?",
 ]
 
 type Props = {
