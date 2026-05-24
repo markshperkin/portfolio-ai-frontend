@@ -26,6 +26,10 @@ const COMMANDS = [
   { name: '/jdfit',     description: 'Paste a JD → fit report' },
 ]
 
+function linkifyUrls(text: string): string {
+  return text.replace(/(?<!\()(?<!\[)(https?:\/\/[^\s)\]]+)/g, '[$1]($1)')
+}
+
 // Anything starting with / renders immediately without char-by-char drip
 function isSlashCommand(text: string): boolean {
   return /^\s*\//.test(text)
@@ -271,9 +275,14 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
                     p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
                     pre: ({ children }) => <pre className="bg-transparent p-0">{children}</pre>,
                     code: ({ children }) => <code className="text-green-300 font-mono">{children}</code>,
+                    a: ({ href, children }) => (
+                      <a href={href} target="_blank" rel="noopener noreferrer" className="text-green-400 underline hover:text-green-300 transition-colors">
+                        {children}
+                      </a>
+                    ),
                   }}
                 >
-                  {msg.content}
+                  {linkifyUrls(msg.content)}
                 </ReactMarkdown>
               </span>
             ) : (
