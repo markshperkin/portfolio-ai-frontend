@@ -12,6 +12,29 @@ import type { SSEEvent } from '@/lib/sse-events'
 type Message = { role: 'user' | 'assistant'; content: string; citations?: string[] }
 type RetrievalStatus = 'extracting' | 'retrieving' | 'searching' | 'synthesizing' | null
 
+type JdfitStepKey = 'extracting' | 'retrieving' | 'synthesizing'
+type JdfitStepState = { key: JdfitStepKey; label: string; done: boolean; active: boolean }
+
+type StepSpeed = {
+  minInterval: number
+  maxInterval: number
+  minIncrement: number
+  maxIncrement: number
+}
+
+// Speeds tuned to expected durations: extracting ~6s, retrieving ~2s, synthesizing ~30s
+const JDFIT_STEP_SPEEDS: Record<JdfitStepKey, StepSpeed> = {
+  extracting:   { minInterval: 300, maxInterval: 700, minIncrement: 2,   maxIncrement: 5   },
+  retrieving:   { minInterval: 100, maxInterval: 250, minIncrement: 5,   maxIncrement: 10  },
+  synthesizing: { minInterval: 300, maxInterval: 700, minIncrement: 0.9, maxIncrement: 2.1 },
+}
+
+const JDFIT_STEPS_INIT: JdfitStepState[] = [
+  { key: 'extracting',   label: 'extracting requirements', done: false, active: true  },
+  { key: 'retrieving',   label: 'retrieving evidence',     done: false, active: false },
+  { key: 'synthesizing', label: 'synthesizing report',     done: false, active: false },
+]
+
 type Props = {
   initialMessages?: Message[]
   showBanner?: boolean
@@ -74,6 +97,77 @@ function StatusSpinner({ status }: { status: string }) {
   )
 }
 
+function ProgressRow({ label, done, active, speed }: { label: string; done: boolean; active: boolean; speed: StepSpeed }) {
+  const [pct, setPct] = useState(0)
+  const [frame, setFrame] = useState(0)
+  const tickRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Irregular slow ticks while active
+  useEffect(() => {
+    if (!active || done) {
+      if (tickRef.current) clearTimeout(tickRef.current)
+      return
+    }
+    const tick = () => {
+      setPct((p) => {
+        if (p >= 88) return p
+        const inc = Math.random() * (speed.maxIncrement - speed.minIncrement) + speed.minIncrement
+        return Math.min(p + inc, 88)
+      })
+      const delay = Math.random() * (speed.maxInterval - speed.minInterval) + speed.minInterval
+      tickRef.current = setTimeout(tick, delay)
+    }
+    const delay = Math.random() * (speed.maxInterval - speed.minInterval) + speed.minInterval
+    tickRef.current = setTimeout(tick, delay)
+    return () => { if (tickRef.current) clearTimeout(tickRef.current) }
+  }, [active, done, speed])
+
+  // Smooth fill to 100% on completion
+  useEffect(() => {
+    if (!done) return
+    if (tickRef.current) clearTimeout(tickRef.current)
+    const fill = () => {
+      setPct((p) => {
+        if (p >= 100) return 100
+        const next = p + 4
+        if (next < 100) tickRef.current = setTimeout(fill, 30)
+        return Math.min(next, 100)
+      })
+    }
+    tickRef.current = setTimeout(fill, 30)
+    return () => { if (tickRef.current) clearTimeout(tickRef.current) }
+  }, [done])
+
+  // Spinner frame for active row
+  useEffect(() => {
+    if (!active || done) return
+    const t = setInterval(() => setFrame((f) => (f + 1) % SPINNER_FRAMES.length), 80)
+    return () => clearInterval(t)
+  }, [active, done])
+
+  const BAR_WIDTH = 20
+  const filled = Math.round((pct / 100) * BAR_WIDTH)
+  const bar = '█'.repeat(filled) + '░'.repeat(BAR_WIDTH - filled)
+  const pctStr = String(Math.round(pct)).padStart(3)
+
+  return (
+    <div className={`font-mono text-sm ${done ? 'text-green-400' : active ? 'text-yellow-600' : 'text-gray-600'}`}>
+      <span className="inline-block w-4">{done ? '✓' : active ? SPINNER_FRAMES[frame] : ' '}</span>
+      {' '}{label.padEnd(26)}[{bar}] {pctStr}%
+    </div>
+  )
+}
+
+function JdfitProgressBars({ steps }: { steps: JdfitStepState[] }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      {steps.map((step) => (
+        <ProgressRow key={step.key} label={step.label} done={step.done} active={step.active} speed={JDFIT_STEP_SPEEDS[step.key]} />
+      ))}
+    </div>
+  )
+}
+
 const LINE_HEIGHT_PX = 24
 const MAX_TEXTAREA_LINES = 5
 const PASTE_CHIP_LINE_THRESHOLD = 5
@@ -83,6 +177,8 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [input, setInput] = useState('')
   const [status, setStatus] = useState<RetrievalStatus>(null)
+  const [jdfitSteps, setJdfitSteps] = useState<JdfitStepState[]>([])
+  const jdfitClearRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [streaming, setStreaming] = useState(false)
   const [bannerDone, setBannerDone] = useState(!showBanner)
   const postBannerRef = useRef(postBannerMessages)
@@ -147,6 +243,8 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
     pasteCountRef.current = 0
     setStreaming(true)
     setStatus(null)
+    setJdfitSteps([])
+    if (jdfitClearRef.current) clearTimeout(jdfitClearRef.current)
     assistantBufRef.current = ''
     isSlashRef.current = isSlashCommand(content)
 
@@ -182,6 +280,19 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
     switch (event.type) {
       case 'retrieval_step':
         setStatus(event.step as RetrievalStatus)
+        if (event.step === 'extracting') {
+          setJdfitSteps(JDFIT_STEPS_INIT.map((s) => ({ ...s })))
+        } else if (event.step === 'retrieving') {
+          setJdfitSteps((prev) => prev.map((s) =>
+            s.key === 'extracting' ? { ...s, done: true, active: false } :
+            s.key === 'retrieving' ? { ...s, active: true } : s
+          ))
+        } else if (event.step === 'synthesizing') {
+          setJdfitSteps((prev) => prev.map((s) =>
+            s.key === 'retrieving'   ? { ...s, done: true, active: false } :
+            s.key === 'synthesizing' ? { ...s, active: true } : s
+          ))
+        }
         break
       case 'delta':
         if (isSlashRef.current) {
@@ -209,6 +320,12 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
         break
       case 'done':
         if (isSlashRef.current) {
+          setJdfitSteps((prev) => {
+            if (prev.length === 0) return prev
+            const next = prev.map((s) => s.key === 'synthesizing' ? { ...s, done: true, active: false } : s)
+            jdfitClearRef.current = setTimeout(() => setJdfitSteps([]), 800)
+            return next
+          })
           setStreaming(false)
           setStatus(null)
         } else {
@@ -296,9 +413,10 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
             )}
           </div>
         ))}
-        {status && (
-          <StatusSpinner status={status} />
-        )}
+        {jdfitSteps.length > 0
+          ? <JdfitProgressBars steps={jdfitSteps} />
+          : status && <StatusSpinner status={status} />
+        }
         <div ref={bottomRef} />
       </div>
 
