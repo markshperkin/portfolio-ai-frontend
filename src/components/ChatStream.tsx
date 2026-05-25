@@ -13,7 +13,7 @@ type Message = { role: 'user' | 'assistant'; content: string; citations?: string
 type RetrievalStatus = 'extracting' | 'retrieving' | 'searching' | 'synthesizing' | null
 
 type JdfitStepKey = 'extracting' | 'retrieving' | 'synthesizing'
-type JdfitStepState = { key: JdfitStepKey; label: string; done: boolean }
+type JdfitStepState = { key: JdfitStepKey; label: string; done: boolean; active: boolean }
 
 type StepSpeed = {
   minInterval: number
@@ -22,16 +22,17 @@ type StepSpeed = {
   maxIncrement: number
 }
 
+// Speeds tuned to expected durations: extracting ~6s, retrieving ~2s, synthesizing ~30s
 const JDFIT_STEP_SPEEDS: Record<JdfitStepKey, StepSpeed> = {
-  extracting:   { minInterval: 300, maxInterval: 700,  minIncrement: 2,   maxIncrement: 5   },
-  retrieving:   { minInterval: 100, maxInterval: 250,  minIncrement: 5,   maxIncrement: 10  },
-  synthesizing: { minInterval: 500, maxInterval: 900,  minIncrement: 0.5, maxIncrement: 2   },
+  extracting:   { minInterval: 300, maxInterval: 700, minIncrement: 2,   maxIncrement: 5   },
+  retrieving:   { minInterval: 100, maxInterval: 250, minIncrement: 5,   maxIncrement: 10  },
+  synthesizing: { minInterval: 300, maxInterval: 700, minIncrement: 0.9, maxIncrement: 2.1 },
 }
 
 const JDFIT_STEPS_INIT: JdfitStepState[] = [
-  { key: 'extracting',   label: 'extracting requirements', done: false },
-  { key: 'retrieving',   label: 'retrieving evidence',     done: false },
-  { key: 'synthesizing', label: 'synthesizing report',     done: false },
+  { key: 'extracting',   label: 'extracting requirements', done: false, active: true  },
+  { key: 'retrieving',   label: 'retrieving evidence',     done: false, active: false },
+  { key: 'synthesizing', label: 'synthesizing report',     done: false, active: false },
 ]
 
 type Props = {
@@ -96,15 +97,15 @@ function StatusSpinner({ status }: { status: string }) {
   )
 }
 
-function ProgressRow({ label, done, speed }: { label: string; done: boolean; speed: StepSpeed }) {
+function ProgressRow({ label, done, active, speed }: { label: string; done: boolean; active: boolean; speed: StepSpeed }) {
   const [pct, setPct] = useState(0)
   const [frame, setFrame] = useState(0)
   const tickRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Irregular slow ticks while active
   useEffect(() => {
-    if (done) {
+    if (!active || done) {
       if (tickRef.current) clearTimeout(tickRef.current)
-      setPct(100)
       return
     }
     const tick = () => {
@@ -119,24 +120,39 @@ function ProgressRow({ label, done, speed }: { label: string; done: boolean; spe
     const delay = Math.random() * (speed.maxInterval - speed.minInterval) + speed.minInterval
     tickRef.current = setTimeout(tick, delay)
     return () => { if (tickRef.current) clearTimeout(tickRef.current) }
-  }, [done, speed])
+  }, [active, done, speed])
 
+  // Smooth fill to 100% on completion
   useEffect(() => {
-    if (done) return
+    if (!done) return
+    if (tickRef.current) clearTimeout(tickRef.current)
+    const fill = () => {
+      setPct((p) => {
+        if (p >= 100) return 100
+        const next = p + 4
+        if (next < 100) tickRef.current = setTimeout(fill, 30)
+        return Math.min(next, 100)
+      })
+    }
+    tickRef.current = setTimeout(fill, 30)
+    return () => { if (tickRef.current) clearTimeout(tickRef.current) }
+  }, [done])
+
+  // Spinner frame for active row
+  useEffect(() => {
+    if (!active || done) return
     const t = setInterval(() => setFrame((f) => (f + 1) % SPINNER_FRAMES.length), 80)
     return () => clearInterval(t)
-  }, [done])
+  }, [active, done])
 
   const BAR_WIDTH = 20
   const filled = Math.round((pct / 100) * BAR_WIDTH)
   const bar = '█'.repeat(filled) + '░'.repeat(BAR_WIDTH - filled)
   const pctStr = String(Math.round(pct)).padStart(3)
-  const isActive = !done && pct > 0
-  const isPending = !done && pct === 0
 
   return (
-    <div className={`font-mono text-sm ${done ? 'text-green-400' : isActive ? 'text-yellow-600' : isPending ? 'text-gray-600' : 'text-gray-600'}`}>
-      <span className="inline-block w-4">{done ? '✓' : isActive ? SPINNER_FRAMES[frame] : ' '}</span>
+    <div className={`font-mono text-sm ${done ? 'text-green-400' : active ? 'text-yellow-600' : 'text-gray-600'}`}>
+      <span className="inline-block w-4">{done ? '✓' : active ? SPINNER_FRAMES[frame] : ' '}</span>
       {' '}{label.padEnd(26)}[{bar}] {pctStr}%
     </div>
   )
@@ -146,7 +162,7 @@ function JdfitProgressBars({ steps }: { steps: JdfitStepState[] }) {
   return (
     <div className="flex flex-col gap-0.5">
       {steps.map((step) => (
-        <ProgressRow key={step.key} label={step.label} done={step.done} speed={JDFIT_STEP_SPEEDS[step.key]} />
+        <ProgressRow key={step.key} label={step.label} done={step.done} active={step.active} speed={JDFIT_STEP_SPEEDS[step.key]} />
       ))}
     </div>
   )
@@ -267,9 +283,15 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
         if (event.step === 'extracting') {
           setJdfitSteps(JDFIT_STEPS_INIT.map((s) => ({ ...s })))
         } else if (event.step === 'retrieving') {
-          setJdfitSteps((prev) => prev.map((s) => s.key === 'extracting' ? { ...s, done: true } : s))
+          setJdfitSteps((prev) => prev.map((s) =>
+            s.key === 'extracting' ? { ...s, done: true, active: false } :
+            s.key === 'retrieving' ? { ...s, active: true } : s
+          ))
         } else if (event.step === 'synthesizing') {
-          setJdfitSteps((prev) => prev.map((s) => s.key === 'retrieving' ? { ...s, done: true } : s))
+          setJdfitSteps((prev) => prev.map((s) =>
+            s.key === 'retrieving'   ? { ...s, done: true, active: false } :
+            s.key === 'synthesizing' ? { ...s, active: true } : s
+          ))
         }
         break
       case 'delta':
@@ -300,7 +322,7 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
         if (isSlashRef.current) {
           setJdfitSteps((prev) => {
             if (prev.length === 0) return prev
-            const next = prev.map((s) => s.key === 'synthesizing' ? { ...s, done: true } : s)
+            const next = prev.map((s) => s.key === 'synthesizing' ? { ...s, done: true, active: false } : s)
             jdfitClearRef.current = setTimeout(() => setJdfitSteps([]), 800)
             return next
           })
