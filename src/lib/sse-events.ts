@@ -3,7 +3,7 @@
 
 export type RetrievalStepEvent = {
   type: 'retrieval_step'
-  step: 'extracting' | 'retrieving' | 'searching' | 'synthesizing'
+  step: 'planning' | 'extracting' | 'retrieving' | 'searching' | 'synthesizing'
   detail?: string
 }
 
