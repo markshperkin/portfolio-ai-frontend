@@ -10,7 +10,7 @@ import { BootupBanner } from './BootupBanner'
 import type { SSEEvent } from '@/lib/sse-events'
 
 type Message = { role: 'user' | 'assistant'; content: string; citations?: string[] }
-type RetrievalStatus = 'extracting' | 'retrieving' | 'searching' | 'synthesizing' | null
+type RetrievalStatus = 'planning' | 'extracting' | 'retrieving' | 'searching' | 'synthesizing' | null
 
 type JdfitStepKey = 'extracting' | 'retrieving' | 'synthesizing'
 type JdfitStepState = { key: JdfitStepKey; label: string; done: boolean; active: boolean }
@@ -78,6 +78,7 @@ function getCommandMatch(input: string) {
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
 const STATUS_LABELS: Record<string, string> = {
+  planning: 'Planning queries…',
   extracting: 'Extracting requirements…',
   retrieving: 'Retrieving…',
   searching: 'Looking in knowledge base…',
@@ -317,6 +318,9 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
         } else {
           window.open(event.url, '_blank')
         }
+        break
+      case 'debug':
+        console.log('[planner queries]', event.data)
         break
       case 'done':
         if (isSlashRef.current) {

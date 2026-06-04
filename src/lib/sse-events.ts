@@ -3,7 +3,7 @@
 
 export type RetrievalStepEvent = {
   type: 'retrieval_step'
-  step: 'extracting' | 'retrieving' | 'searching' | 'synthesizing'
+  step: 'planning' | 'extracting' | 'retrieving' | 'searching' | 'synthesizing'
   detail?: string
 }
 
@@ -42,6 +42,11 @@ export type ModelEvent = {
   model: 'haiku' | 'sonnet'
 }
 
+export type DebugEvent = {
+  type: 'debug'
+  data: Record<string, unknown>
+}
+
 export type SSEEvent =
   | RetrievalStepEvent
   | DeltaEvent
@@ -50,3 +55,4 @@ export type SSEEvent =
   | ErrorEvent
   | ActionEvent
   | ModelEvent
+  | DebugEvent
