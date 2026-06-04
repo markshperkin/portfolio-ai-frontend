@@ -42,6 +42,11 @@ export type ModelEvent = {
   model: 'haiku' | 'sonnet'
 }
 
+export type DebugEvent = {
+  type: 'debug'
+  data: Record<string, unknown>
+}
+
 export type SSEEvent =
   | RetrievalStepEvent
   | DeltaEvent
@@ -50,3 +55,4 @@ export type SSEEvent =
   | ErrorEvent
   | ActionEvent
   | ModelEvent
+  | DebugEvent

@@ -319,6 +319,9 @@ export function ChatStream({ initialMessages = [], showBanner = false, postBanne
           window.open(event.url, '_blank')
         }
         break
+      case 'debug':
+        console.log('[planner queries]', event.data)
+        break
       case 'done':
         if (isSlashRef.current) {
           setJdfitSteps((prev) => {
