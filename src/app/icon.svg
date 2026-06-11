@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Background -->
+  <rect width="32" height="32" rx="5" fill="#0d0d0d"/>
+
+  <!-- Terminal prompt > -->
+  <text x="3" y="21" font-family="monospace" font-size="17" font-weight="700" fill="#00e676">&#x3e;</text>
+
+  <!-- Cursor bar -->
+  <rect x="15" y="19" width="7" height="2.5" rx="1" fill="#00e676"/>
+
+  <!-- Neural network nodes -->
+  <circle cx="25" cy="6" r="2" fill="#448aff"/>
+  <circle cx="29" cy="11" r="1.5" fill="#7c4dff"/>
+  <circle cx="21" cy="10" r="1.5" fill="#448aff"/>
+  <circle cx="27" cy="15" r="1.2" fill="#7c4dff" opacity="0.8"/>
+
+  <!-- Neural connections -->
+  <line x1="25" y1="6" x2="29" y2="11" stroke="#448aff" stroke-width="0.7" opacity="0.6"/>
+  <line x1="25" y1="6" x2="21" y2="10" stroke="#448aff" stroke-width="0.7" opacity="0.6"/>
+  <line x1="29" y1="11" x2="27" y2="15" stroke="#7c4dff" stroke-width="0.7" opacity="0.5"/>
+  <line x1="21" y1="10" x2="27" y2="15" stroke="#7c4dff" stroke-width="0.7" opacity="0.5"/>
+</svg>
