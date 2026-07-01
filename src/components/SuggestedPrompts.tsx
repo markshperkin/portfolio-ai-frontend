@@ -7,6 +7,7 @@ const PROMPTS = [
   "Tell me about Mark's Thesis",
   "What quotes does Mark live by?",
   "What did 20 years of competitive swimming teach Mark about engineering?",
+  "Give me one fun fact about Mark",
 ]
 
 type Props = {
