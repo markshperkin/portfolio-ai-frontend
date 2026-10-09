@@ -64,3 +64,9 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 ## Deployment
 
 Push to `test` or `prod` branch → GitHub Actions runs ESLint + TypeScript check → builds Docker image → pushes to GHCR (`ghcr.io/markshperkin/portfolio-ai-frontend:<branch>`) → SSH-deploys to VPS.
+
+`test` deploys only when the repo variable `DEPLOY_TEST` is `true` (unset = checks only, no deploy). Turn test deploys back on with:
+
+```bash
+gh variable set DEPLOY_TEST --body true -R markshperkin/portfolio-ai-frontend
+```
