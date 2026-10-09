@@ -36,7 +36,7 @@ function modelLine(mdl: CheckResult, col: number): string {
   if (mdl.detail === 'sonnet') {
     return `[ WARN ] ${pad('model: claude haiku down', col)} claude sonnet ready`
   }
-  return `[  OK  ] ${pad('model: claude haiku 4.5', col)} ready`
+  return `[  OK  ] ${pad('model: claude haiku 5.5', col)} ready`
 }
 
 function buildChecks(r: Readiness): string {
